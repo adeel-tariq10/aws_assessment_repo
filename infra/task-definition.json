@@ -4,12 +4,12 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
-  "executionRoleArn": "REPLACE_WITH_EXECUTION_ROLE_ARN",
-  "taskRoleArn": "REPLACE_WITH_TASK_ROLE_ARN",
+  "executionRoleArn": "arn:aws:iam::522814724509:role/assessment-hello-world-ecs-execution",
+  "taskRoleArn": "arn:aws:iam::522814724509:role/assessment-hello-world-ecs-task",
   "containerDefinitions": [
     {
       "name": "assessment-hello-world-app",
-      "image": "REPLACE_WITH_ECR_IMAGE_URI",
+      "image": "522814724509.dkr.ecr.us-west-2.amazonaws.com/assessment-hello-world:latest",
       "essential": true,
       "portMappings": [
         {

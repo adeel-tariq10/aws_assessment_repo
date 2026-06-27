@@ -16,6 +16,24 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
+$tempDir = Join-Path $env:TEMP "assessment-hello-world"
+New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+
+function Set-Utf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Value, $encoding)
+}
 
 Write-Host "=== AWS Assessment Infrastructure Setup ===" -ForegroundColor Cyan
 Write-Host "Region: $AwsRegion"
@@ -32,21 +50,28 @@ Write-Host "VPC: $vpcId"
 Write-Host "Subnet: $subnetId"
 
 # CloudWatch log group
-aws logs create-log-group --log-group-name "/ecs/$ProjectName" --region $AwsRegion 2>$null
+try {
+    aws logs create-log-group --log-group-name "/ecs/$ProjectName" --region $AwsRegion 2>$null
+} catch {}
 Write-Host "Log group: /ecs/$ProjectName"
 
 # ECR repository
-aws ecr create-repository --repository-name $ProjectName --region $AwsRegion 2>$null
+try {
+    aws ecr create-repository --repository-name $ProjectName --region $AwsRegion 2>$null
+} catch {}
 $ecrUri = "$accountId.dkr.ecr.$AwsRegion.amazonaws.com/$ProjectName"
 Write-Host "ECR: $ecrUri"
 
 # Security group - allow inbound HTTP on port 3000
-$sgId = aws ec2 create-security-group `
-    --group-name "$ProjectName-sg" `
-    --description "Allow HTTP for Hello AWS assessment" `
-    --vpc-id $vpcId `
-    --region $AwsRegion `
-    --query GroupId --output text 2>$null
+$sgId = $null
+try {
+    $sgId = aws ec2 create-security-group `
+        --group-name "$ProjectName-sg" `
+        --description "Allow HTTP for Hello AWS assessment" `
+        --vpc-id $vpcId `
+        --region $AwsRegion `
+        --query GroupId --output text 2>$null
+} catch {}
 
 if (-not $sgId -or $sgId -eq "None") {
     $sgId = aws ec2 describe-security-groups `
@@ -54,12 +79,14 @@ if (-not $sgId -or $sgId -eq "None") {
         --query "SecurityGroups[0].GroupId" --output text --region $AwsRegion
 }
 
-aws ec2 authorize-security-group-ingress `
-    --group-id $sgId `
-    --protocol tcp `
-    --port 3000 `
-    --cidr 0.0.0.0/0 `
-    --region $AwsRegion 2>$null
+try {
+    aws ec2 authorize-security-group-ingress `
+        --group-id $sgId `
+        --protocol tcp `
+        --port 3000 `
+        --cidr 0.0.0.0/0 `
+        --region $AwsRegion 2>$null
+} catch {}
 
 Write-Host "Security group: $sgId"
 
@@ -67,7 +94,9 @@ $clusterName = "$ProjectName-cluster"
 $serviceName = "$ProjectName-service"
 
 # ECS cluster
-aws ecs create-cluster --cluster-name $clusterName --region $AwsRegion 2>$null
+try {
+    aws ecs create-cluster --cluster-name $clusterName --region $AwsRegion 2>$null
+} catch {}
 Write-Host "ECS cluster: $clusterName"
 
 # IAM roles
@@ -83,15 +112,23 @@ $trustPolicy = @"
   ]
 }
 "@
+$trustPolicyPath = Join-Path $tempDir "ecs-task-trust-policy.json"
+Set-Utf8NoBom -Path $trustPolicyPath -Value $trustPolicy
 
 $execRoleName = "$ProjectName-ecs-execution"
 $taskRoleName = "$ProjectName-ecs-task"
 $githubRoleName = "$ProjectName-github-actions"
 
-aws iam create-role --role-name $execRoleName --assume-role-policy-document $trustPolicy 2>$null
-aws iam attach-role-policy --role-name $execRoleName --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy 2>$null
+try {
+    aws iam create-role --role-name $execRoleName --assume-role-policy-document "file://$trustPolicyPath" 2>$null
+} catch {}
+try {
+    aws iam attach-role-policy --role-name $execRoleName --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy 2>$null
+} catch {}
 
-aws iam create-role --role-name $taskRoleName --assume-role-policy-document $trustPolicy 2>$null
+try {
+    aws iam create-role --role-name $taskRoleName --assume-role-policy-document "file://$trustPolicyPath" 2>$null
+} catch {}
 
 $execRoleArn = aws iam get-role --role-name $execRoleName --query Role.Arn --output text
 $taskRoleArn = aws iam get-role --role-name $taskRoleName --query Role.Arn --output text
@@ -101,11 +138,13 @@ Write-Host "Task role: $taskRoleArn"
 
 # GitHub OIDC provider (idempotent - may already exist)
 $oidcProviderArn = "arn:aws:iam::${accountId}:oidc-provider/token.actions.githubusercontent.com"
-aws iam create-open-id-connect-provider `
-    --url https://token.actions.githubusercontent.com `
-    --client-id-list sts.amazonaws.com `
-    --thumbprint-list 6938fd4d98bab03faadfb0f0c1d4a5b2d5a5b2d5a `
-    2>$null
+try {
+    aws iam create-open-id-connect-provider `
+        --url https://token.actions.githubusercontent.com `
+        --client-id-list sts.amazonaws.com `
+        --thumbprint-list 6938fd4d98bab03faadfb0f0c1d4a5b2d5a5b2d5a `
+        2>$null
+} catch {}
 
 $githubTrust = @"
 {
@@ -129,8 +168,12 @@ $githubTrust = @"
   ]
 }
 "@
+$githubTrustPath = Join-Path $tempDir "github-actions-trust-policy.json"
+Set-Utf8NoBom -Path $githubTrustPath -Value $githubTrust
 
-aws iam create-role --role-name $githubRoleName --assume-role-policy-document $githubTrust 2>$null
+try {
+    aws iam create-role --role-name $githubRoleName --assume-role-policy-document "file://$githubTrustPath" 2>$null
+} catch {}
 
 $githubPolicy = @"
 {
@@ -170,8 +213,12 @@ $githubPolicy = @"
   ]
 }
 "@
+$githubPolicyPath = Join-Path $tempDir "github-actions-deploy-policy.json"
+Set-Utf8NoBom -Path $githubPolicyPath -Value $githubPolicy
 
-aws iam put-role-policy --role-name $githubRoleName --policy-name deploy-policy --policy-document $githubPolicy 2>$null
+try {
+    aws iam put-role-policy --role-name $githubRoleName --policy-name deploy-policy --policy-document "file://$githubPolicyPath" 2>$null
+} catch {}
 $githubRoleArn = aws iam get-role --role-name $githubRoleName --query Role.Arn --output text
 Write-Host "GitHub Actions role: $githubRoleArn"
 
@@ -182,21 +229,23 @@ $taskDef = $taskDef.Replace("REPLACE_WITH_EXECUTION_ROLE_ARN", $execRoleArn)
 $taskDef = $taskDef.Replace("REPLACE_WITH_TASK_ROLE_ARN", $taskRoleArn)
 $taskDef = $taskDef.Replace("REPLACE_WITH_ECR_IMAGE_URI", "${ecrUri}:latest")
 
-$tempTaskDef = Join-Path $env:TEMP "task-definition-resolved.json"
-$taskDef | Set-Content $tempTaskDef -Encoding UTF8
+$tempTaskDef = Join-Path $tempDir "task-definition-resolved.json"
+Set-Utf8NoBom -Path $tempTaskDef -Value $taskDef
 
 $taskDefArn = aws ecs register-task-definition --cli-input-json "file://$tempTaskDef" --query "taskDefinition.taskDefinitionArn" --output text --region $AwsRegion
 Write-Host "Task definition: $taskDefArn"
 
 # Create ECS service
-aws ecs create-service `
-    --cluster $clusterName `
-    --service-name $serviceName `
-    --task-definition $taskDefArn `
-    --desired-count 1 `
-    --launch-type FARGATE `
-    --network-configuration "awsvpcConfiguration={subnets=[$subnetId],securityGroups=[$sgId],assignPublicIp=ENABLED}" `
-    --region $AwsRegion 2>$null
+try {
+    aws ecs create-service `
+        --cluster $clusterName `
+        --service-name $serviceName `
+        --task-definition $taskDefArn `
+        --desired-count 1 `
+        --launch-type FARGATE `
+        --network-configuration "awsvpcConfiguration={subnets=[$subnetId],securityGroups=[$sgId],assignPublicIp=ENABLED}" `
+        --region $AwsRegion 2>$null
+} catch {}
 
 Write-Host ""
 Write-Host "=== Setup Complete ===" -ForegroundColor Green
