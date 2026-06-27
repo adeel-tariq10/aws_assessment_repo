@@ -1,0 +1,16 @@
+{
+  "name": "hello-aws-assessment",
+  "version": "1.0.0",
+  "description": "Simple containerized Hello World app for AWS technical assessment",
+  "main": "app/server.js",
+  "scripts": {
+    "start": "node app/server.js",
+    "dev": "node app/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
