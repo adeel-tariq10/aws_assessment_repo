@@ -47,7 +47,7 @@ Your machine currently needs these tools. Install before recording.
 ### 2. AWS CLI v2
 - Download: https://aws.amazon.com/cli/
 - Verify: `aws --version`
-- Configure: `aws configure` (Access Key, Secret, region `us-east-1`)
+- Configure/sign in with the AWS CLI and use the assessment region `us-west-2`
 
 ### 3. AWS account
 - Free tier is sufficient for this demo
@@ -82,13 +82,13 @@ git commit -m "Initial commit: Hello World app with Docker and CI/CD"
 ### Step 2: Create GitHub repo and push
 
 1. Go to https://github.com/new
-2. Name: `hello-aws-assessment` (or your choice — update scripts if different)
+2. Name: `aws_assessment_repo` (or your choice - update scripts if different)
 3. Do **not** initialize with README (you already have files)
 4. Push:
 
 ```powershell
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/hello-aws-assessment.git
+git remote add origin https://github.com/YOUR_USERNAME/aws_assessment_repo.git
 git push -u origin main
 ```
 
@@ -148,7 +148,7 @@ After `aws configure` works:
 
 ```powershell
 cd "C:\Users\Dev\Desktop\AWS Technical Assessment"
-.\scripts\setup-aws.ps1 -GitHubOrg YOUR_GITHUB_USERNAME -GitHubRepo hello-aws-assessment
+.\scripts\setup-aws.ps1 -GitHubOrg YOUR_GITHUB_USERNAME -GitHubRepo aws_assessment_repo
 ```
 
 This creates: ECR repo, ECS cluster/service, IAM roles, security group, CloudWatch log group.
@@ -185,9 +185,9 @@ Open the URL in a browser — same Hello JSON, now on AWS.
 **Manual alternative (if you want to demo ECR push before CI/CD):**
 
 ```powershell
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
-docker tag hello-aws-assessment:local ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/hello-aws-assessment:latest
-docker push ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/hello-aws-assessment:latest
+aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin ACCOUNT_ID.dkr.ecr.us-west-2.amazonaws.com
+docker tag hello-aws-assessment:local ACCOUNT_ID.dkr.ecr.us-west-2.amazonaws.com/assessment-hello-world:latest
+docker push ACCOUNT_ID.dkr.ecr.us-west-2.amazonaws.com/assessment-hello-world:latest
 ```
 
 ---
@@ -251,7 +251,7 @@ Suggested **10–15 minute** Loom outline:
                                        ▼
                               ┌──────────────────┐
                               │  ECS Fargate     │
-                              │  (hello-aws-app) │
+                              │  (assessment app)│
                               └────────┬─────────┘
                                        │ :3000
                                        ▼
@@ -272,11 +272,11 @@ Suggested **10–15 minute** Loom outline:
 Avoid ongoing charges:
 
 ```powershell
-aws ecs update-service --cluster hello-aws-cluster --service hello-aws-service --desired-count 0 --region us-east-1
-aws ecs delete-service --cluster hello-aws-cluster --service hello-aws-service --force --region us-east-1
-aws ecs delete-cluster --cluster hello-aws-cluster --region us-east-1
-aws ecr delete-repository --repository-name hello-aws-assessment --force --region us-east-1
-aws logs delete-log-group --log-group-name /ecs/hello-aws-assessment --region us-east-1
+aws ecs update-service --cluster assessment-hello-world-cluster --service assessment-hello-world-service --desired-count 0 --region us-west-2
+aws ecs delete-service --cluster assessment-hello-world-cluster --service assessment-hello-world-service --force --region us-west-2
+aws ecs delete-cluster --cluster assessment-hello-world-cluster --region us-west-2
+aws ecr delete-repository --repository-name assessment-hello-world --force --region us-west-2
+aws logs delete-log-group --log-group-name /ecs/assessment-hello-world --region us-west-2
 # Delete IAM roles and security group via console or CLI as needed
 ```
 
@@ -289,7 +289,7 @@ aws logs delete-log-group --log-group-name /ecs/hello-aws-assessment --region us
 | Docker not found | Install Docker Desktop; restart terminal |
 | AWS CLI not found | Install AWS CLI v2; add to PATH |
 | GitHub Action fails on OIDC | Check `AWS_ROLE_ARN` secret; repo name in IAM trust policy |
-| ECS task won't start | CloudWatch → `/ecs/hello-aws-assessment`; check execution role |
+| ECS task won't start | CloudWatch -> `/ecs/assessment-hello-world`; check execution role |
 | Can't reach app URL | Security group must allow TCP 3000; task needs `assignPublicIp=ENABLED` |
 | `wget` health check fails | Alpine image has wget; if you change base image, adjust health check |
 

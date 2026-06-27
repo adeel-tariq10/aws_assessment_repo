@@ -1,8 +1,8 @@
 # Returns the URL for the running ECS task (public IP on port 3000).
 param(
-    [string]$AwsRegion = "us-east-1",
-    [string]$Cluster = "hello-aws-cluster",
-    [string]$Service = "hello-aws-service"
+    [string]$AwsRegion = "us-west-2",
+    [string]$Cluster = "assessment-hello-world-cluster",
+    [string]$Service = "assessment-hello-world-service"
 )
 
 $ErrorActionPreference = "Stop"

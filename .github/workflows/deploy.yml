@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: hello-aws-assessment
-  ECS_CLUSTER: hello-aws-cluster
-  ECS_SERVICE: hello-aws-service
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: assessment-hello-world
+  ECS_CLUSTER: assessment-hello-world-cluster
+  ECS_SERVICE: assessment-hello-world-service
   ECS_TASK_DEFINITION: infra/task-definition.json
-  CONTAINER_NAME: hello-aws-app
+  CONTAINER_NAME: assessment-hello-world-app
 
 permissions:
   contents: read

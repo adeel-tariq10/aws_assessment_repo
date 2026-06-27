@@ -2,7 +2,7 @@
 # Run from PowerShell after: aws configure (or SSO login)
 #
 # Usage:
-#   .\scripts\setup-aws.ps1 -GitHubOrg YOUR_GITHUB_USERNAME -GitHubRepo hello-aws-assessment
+#   .\scripts\setup-aws.ps1 -GitHubOrg YOUR_GITHUB_USERNAME -GitHubRepo aws_assessment_repo
 
 param(
     [Parameter(Mandatory = $true)]
@@ -11,8 +11,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$GitHubRepo,
 
-    [string]$AwsRegion = "us-east-1",
-    [string]$ProjectName = "hello-aws-assessment"
+    [string]$AwsRegion = "us-west-2",
+    [string]$ProjectName = "assessment-hello-world"
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,9 +63,12 @@ aws ec2 authorize-security-group-ingress `
 
 Write-Host "Security group: $sgId"
 
+$clusterName = "$ProjectName-cluster"
+$serviceName = "$ProjectName-service"
+
 # ECS cluster
-aws ecs create-cluster --cluster-name hello-aws-cluster --region $AwsRegion 2>$null
-Write-Host "ECS cluster: hello-aws-cluster"
+aws ecs create-cluster --cluster-name $clusterName --region $AwsRegion 2>$null
+Write-Host "ECS cluster: $clusterName"
 
 # IAM roles
 $trustPolicy = @"
@@ -187,8 +190,8 @@ Write-Host "Task definition: $taskDefArn"
 
 # Create ECS service
 aws ecs create-service `
-    --cluster hello-aws-cluster `
-    --service-name hello-aws-service `
+    --cluster $clusterName `
+    --service-name $serviceName `
     --task-definition $taskDefArn `
     --desired-count 1 `
     --launch-type FARGATE `
@@ -205,7 +208,7 @@ Write-Host ""
 Write-Host "Update infra/task-definition.json with your role ARNs and ECR URI, then commit."
 Write-Host ""
 Write-Host "Get the public IP of your running task:" -ForegroundColor Yellow
-Write-Host "  aws ecs list-tasks --cluster hello-aws-cluster --service-name hello-aws-service --region $AwsRegion"
-Write-Host "  aws ecs describe-tasks --cluster hello-aws-cluster --tasks <TASK_ARN> --query 'tasks[0].attachments[0].details[?name==\`networkInterfaceId\`].value' --output text --region $AwsRegion"
+Write-Host "  aws ecs list-tasks --cluster $clusterName --service-name $serviceName --region $AwsRegion"
+Write-Host "  aws ecs describe-tasks --cluster $clusterName --tasks <TASK_ARN> --query 'tasks[0].attachments[0].details[?name==\`networkInterfaceId\`].value' --output text --region $AwsRegion"
 Write-Host "  Then look up the public IP in EC2 > Network Interfaces, or use the helper script:"
-Write-Host "  .\scripts\get-app-url.ps1"
+Write-Host "  .\scripts\get-app-url.ps1 -AwsRegion $AwsRegion -Cluster $clusterName -Service $serviceName"
